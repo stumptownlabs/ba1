@@ -1,0 +1,3 @@
+[submodule "userpatches"]
+	path = userpatches
+	url = git@gitlab.com:nova/userpatches.git
