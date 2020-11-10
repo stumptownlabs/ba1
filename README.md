@@ -1,3 +1,15 @@
+How to compile Armbian for novachat
+
+```bash
+git clone git@gitlab.com:nova/ba1.git
+cd ba1
+git submodule init
+git submodule update
+./compile.sh EXTRAWIFI="no"
+```
+
+
+
 <h3 align=center><a href="#armbian-build-tools"><img src=".github/armbian-logo.png" alt="Armbian logo" width="144"></a><br>
 build tools</h3>
 
