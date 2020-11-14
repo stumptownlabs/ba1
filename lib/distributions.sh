@@ -212,8 +212,10 @@ install_common()
 	EOF
 
 	display_alert "Updating" "package lists"
-	chroot "${SDCARD}" /bin/bash -c "apt-get update &>/dev/null"
-	[[ $? -ne 0 ]] && exit_with_error "Updating packages failed"
+	chroot "${SDCARD}" /bin/bash -c "apt-get update" >> "${DEST}"/debug/install.log 2>&1
+
+	display_alert "Temporarily disabling" "initramfs-tools hook for kernel"
+	chroot "${SDCARD}" /bin/bash -c "chmod -x /etc/kernel/postinst.d/initramfs-tools" >> "${DEST}"/debug/install.log 2>&1
 
 	# install family packages
 	if [[ -n ${PACKAGE_LIST_FAMILY} ]]; then
@@ -548,7 +550,7 @@ install_distribution_specific()
 			sed '/security/ d' -i "${SDCARD}"/etc/apt/sources.list
 
 		;;
-	bionic|eoan|focal)
+	bionic|groovy|focal)
 
 			# by using default lz4 initrd compression leads to corruption, go back to proven method
 			sed -i "s/^COMPRESS=.*/COMPRESS=gzip/" "${SDCARD}"/etc/initramfs-tools/initramfs.conf

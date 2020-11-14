@@ -17,9 +17,10 @@ create_board_package()
 {
 	display_alert "Creating board support package" "$BOARD $BRANCH" "info"
 
-	local destination=$SRC/.tmp/${RELEASE}/${CHOSEN_ROOTFS}_${REVISION}_${ARCH}
+	local destination=$(mktemp -d)/${RELEASE}/${CHOSEN_ROOTFS}_${REVISION}_${ARCH}
 	rm -rf "${destination}"
 	mkdir -p "${destination}"/DEBIAN
+	cd $destination
 
 	# install copy of boot script & environment file
 	local bootscript_src=${BOOTSCRIPT%%:*}
@@ -164,15 +165,15 @@ create_board_package()
 
 	EOF
 
-#	if [[ $RELEASE == bionic && $LINUXFAMILY != imx* ]]; then
-#		cat <<-EOF >> "${destination}"/DEBIAN/postinst
-#		# temporally disable acceleration on some arch in Bionic due to broken mesa packages
-#		echo 'Section "Device"
-#		\tIdentifier \t"Default Device"
-#		\tOption \t"AccelMethod" "none"
-#		EndSection' >> /etc/X11/xorg.conf.d/01-armbian-defaults.conf
-#		EOF
-#	fi
+	if [[ $RELEASE == bionic ]] || [[ $RELEASE == focal && $BOARDFAMILY == sun50iw6 ]]; then
+		cat <<-EOF >> "${destination}"/DEBIAN/postinst
+		# temporally disable acceleration on some arch in Bionic due to broken mesa packages
+		echo 'Section "Device"
+		\tIdentifier \t"Default Device"
+		\tOption \t"AccelMethod" "none"
+		EndSection' >> /etc/X11/xorg.conf.d/01-armbian-defaults.conf
+		EOF
+	fi
 
 	# install bootscripts if they are not present. Fix upgrades from old images
 	if [[ $FORCE_BOOTSCRIPT_UPDATE == yes ]]; then
@@ -254,7 +255,7 @@ fi
 	#EOF
 
 	# copy common files from a premade directory structure
-	rsync -a "${SRC}"/packages/bsp/common/* "${destination}"/
+	rsync -a ${SRC}/packages/bsp/common/* ${destination}
 
 	# trigger uInitrd creation after installation, to apply
 	# /etc/initramfs/post-update.d/99-uboot

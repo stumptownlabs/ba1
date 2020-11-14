@@ -10,6 +10,7 @@
 
 # NOTE: If you want to transfer files between chroot and host
 # userpatches/overlay directory on host is bind-mounted to /tmp/overlay in chroot
+# The sd card's root path is accessible via $SDCARD variable.
 
 RELEASE=$1
 LINUXFAMILY=$2
@@ -18,9 +19,6 @@ BUILD_DESKTOP=$4
 
 Main() {
 	case $RELEASE in
-		xenial)
-			# your code here
-			;;
 		stretch)
 			# your code here
 			# InstallOpenMediaVault # uncomment to get an OMV 4 image
@@ -28,7 +26,13 @@ Main() {
 		buster)
 			# your code here
 			;;
+		bullseye)
+			# your code here
+			;;
 		bionic)
+			# your code here
+			;;
+		focal)
 			# your code here
 			;;
 	esac
@@ -183,7 +187,7 @@ InstallOpenMediaVault() {
 		bananapim3|nanopifire3|nanopct3plus|nanopim3)
 			HMP_Fix='; taskset -c -p 4-7 $i '
 			;;
-		rk33*|edge*|ficus|firefly-rk3399|nanopct4|nanopim4|nanopineo4|renegade-elite|roc-rk3399-pc|rockpro64)
+		edge*|ficus|firefly-rk3399|nanopct4|nanopim4|nanopineo4|renegade-elite|roc-rk3399-pc|rockpro64)
 			HMP_Fix='; taskset -c -p 4-5 $i '
 			;;
 	esac
