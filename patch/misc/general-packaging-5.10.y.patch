@@ -12,10 +12,32 @@ index 5858d6e44..e81b8a6fc 100644
  all:	Image.gz
  
 diff --git a/scripts/package/builddeb b/scripts/package/builddeb
-index 6df3c9f..d33e1f3 100755
+index 1b11f8993..c21d931ea 100755
 --- a/scripts/package/builddeb
 +++ b/scripts/package/builddeb
-@@ -41,9 +41,46 @@ create_package() {
+@@ -26,29 +26,61 @@ if_enabled_echo() {
+ 
+ create_package() {
+ 	local pname="$1" pdir="$2"
+-	local dpkg_deb_opts
+ 
+ 	mkdir -m 755 -p "$pdir/DEBIAN"
+ 	mkdir -p "$pdir/usr/share/doc/$pname"
+ 	cp debian/copyright "$pdir/usr/share/doc/$pname/"
+ 	cp debian/changelog "$pdir/usr/share/doc/$pname/changelog.Debian"
+-	gzip -n -9 "$pdir/usr/share/doc/$pname/changelog.Debian"
++	gzip -9 "$pdir/usr/share/doc/$pname/changelog.Debian"
+ 	sh -c "cd '$pdir'; find . -type f ! -path './DEBIAN/*' -printf '%P\0' \
+ 		| xargs -r0 md5sum > DEBIAN/md5sums"
+ 
+ 	# Fix ownership and permissions
+-	if [ "$DEB_RULES_REQUIRES_ROOT" = "no" ]; then
+-		dpkg_deb_opts="--root-owner-group"
+-	else
+-		chown -R root:root "$pdir"
+-	fi
++	chown -R root:root "$pdir"
+ 	chmod -R go-w "$pdir"
  	# in case we are in a restrictive umask environment like 0077
  	chmod -R a+rX "$pdir"
  
@@ -57,14 +79,22 @@ index 6df3c9f..d33e1f3 100755
 +	fi
 +
  	# Create the package
--	dpkg-gencontrol -p$pname -P"$pdir"
--	dpkg-deb ${KDEB_COMPRESS:+-Z$KDEB_COMPRESS} --build "$pdir" ..
-+	dpkg-gencontrol -p$pname -P"$pdir"
+ 	dpkg-gencontrol -p$pname -P"$pdir"
+-	dpkg-deb $dpkg_deb_opts ${KDEB_COMPRESS:+-Z$KDEB_COMPRESS} --build "$pdir" ..
 +	dpkg-deb --build "$pdir" ..
  }
  
  deploy_kernel_headers () {
-@@ -100,9 +122,15 @@ deploy_libc_headers () {
+@@ -60,7 +92,7 @@ deploy_kernel_headers () {
+ 		cd $srctree
+ 		find . arch/$SRCARCH -maxdepth 1 -name Makefile\*
+ 		find include scripts -type f -o -type l
+-		find arch/$SRCARCH -name Kbuild.platforms -o -name Platform
++		find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform
+ 		find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f
+ 	) > debian/hdrsrcfiles
+ 
+@@ -105,9 +137,15 @@ deploy_libc_headers () {
  }
  
  version=$KERNELRELEASE
@@ -83,7 +113,7 @@ index 6df3c9f..d33e1f3 100755
  dbg_packagename=$packagename-dbg
  
  if [ "$ARCH" = "um" ] ; then
-@@ -113,6 +141,15 @@ fi
+@@ -118,6 +156,15 @@ fi
  # XXX: have each arch Makefile export a variable of the canonical image install
  # path instead
  case $ARCH in
@@ -99,7 +129,7 @@ index 6df3c9f..d33e1f3 100755
  um)
  	installed_image_path="usr/bin/linux-$version"
  	;;
-@@ -126,13 +163,17 @@ esac
+@@ -131,13 +178,17 @@ esac
  BUILD_DEBUG=$(if_enabled_echo CONFIG_DEBUG_INFO Yes)
  
  # Setup the directory structure
@@ -119,7 +149,7 @@ index 6df3c9f..d33e1f3 100755
  	cp System.map "$tmpdir/usr/lib/uml/modules/$version/System.map"
  	cp $KCONFIG_CONFIG "$tmpdir/usr/share/doc/$packagename/config"
  	gzip "$tmpdir/usr/share/doc/$packagename/config"
-@@ -176,6 +217,21 @@ if is_enabled CONFIG_MODULES; then
+@@ -181,6 +232,21 @@ if is_enabled CONFIG_MODULES; then
  	fi
  fi
  
@@ -141,7 +171,7 @@ index 6df3c9f..d33e1f3 100755
  # Install the maintainer scripts
  # Note: hook scripts under /etc/kernel are also executed by official Debian
  # kernel packages, as well as kernel packages built using make-kpkg.
-@@ -185,7 +241,7 @@ debhookdir=${KDEB_HOOKDIR:-/etc/kernel}
+@@ -190,7 +256,7 @@ debhookdir=${KDEB_HOOKDIR:-/etc/kernel}
  for script in postinst postrm preinst prerm ; do
  	mkdir -p "$tmpdir$debhookdir/$script.d"
  	cat <<EOF > "$tmpdir/DEBIAN/$script"
@@ -150,13 +180,14 @@ index 6df3c9f..d33e1f3 100755
  
  set -e
  
-@@ -201,12 +257,72 @@ EOF
+@@ -206,14 +272,72 @@ EOF
  	chmod 755 "$tmpdir/DEBIAN/$script"
  done
  
 -if [ "$ARCH" != "um" ]; then
--	deploy_kernel_headers debian/linux-headers
--	create_package linux-headers-$version debian/linux-headers
+-	if is_enabled CONFIG_MODULES; then
+-		deploy_kernel_headers debian/linux-headers
+-		create_package linux-headers-$version debian/linux-headers
 +##
 +## Create sym link to kernel image
 +##
@@ -185,14 +216,12 @@ index 6df3c9f..d33e1f3 100755
 +			break
 +		fi
 +	done
- 
--	deploy_libc_headers debian/linux-libc-dev
--	create_package linux-libc-dev debian/linux-libc-dev
++
 +	bootfstype=\$(blkid -s TYPE -o value \$boot_partition)
 +	if [ "\$bootfstype" = "vfat" ]; then
 +		# we have to keep it mounted! umount /boot
 +		rm -f /boot/System.map* /boot/config* /boot/vmlinuz* /boot/$image_name /boot/uImage
-+	fi
+ 	fi
 +}
 +mountpoint -q /boot && check_and_unmount
 +EOT
@@ -219,7 +248,9 @@ index 6df3c9f..d33e1f3 100755
 +(cd $objtree; cp $KCONFIG_CONFIG $destdir/.config) # copy .config manually to be where it's expected to be
 +ln -sf "/usr/src/linux-headers-$version" "$kernel_headers_dir/lib/modules/$version/build"
 +rm -f "$objtree/debian/hdrsrcfiles" "$objtree/debian/hdrobjfiles"
-+
+ 
+-	deploy_libc_headers debian/linux-libc-dev
+-	create_package linux-libc-dev debian/linux-libc-dev
 +(cd $destdir; make M=scripts clean)
 +
 +if [ "$ARCH" != "um" ]; then
@@ -228,24 +259,47 @@ index 6df3c9f..d33e1f3 100755
  fi
  
  create_package "$packagename" "$tmpdir"
+diff --git a/scripts/package/mkdebian b/scripts/package/mkdebian
+index 60a2a63a5..7c6197efa 100755
 --- a/scripts/package/mkdebian
 +++ b/scripts/package/mkdebian
-@@ -94,10 +94,12 @@ else
+@@ -94,16 +94,18 @@ else
  	packageversion=$version-$revision
  fi
  sourcename=$KDEB_SOURCENAME
--packagename=linux-image-$version
--kernel_headers_packagename=linux-headers-$version
 +packagename=linux-image-$BRANCH$LOCALVERSION
 +kernel_headers_packagename=linux-headers-$BRANCH$LOCALVERSION
 +dtb_packagename=linux-dtb-$BRANCH$LOCALVERSION
- dbg_packagename=$packagename-dbg
- debarch=
++dbg_packagename=$packagename-dbg
++debarch=
 +image_name=
- set_debarch
++set_debarch
  
  if [ "$ARCH" = "um" ] ; then
-@@ -183,8 +185,14 @@ Description: Linux kernel, version $version
+-	packagename=user-mode-linux
+-else
+-	packagename=linux-image
++	packagename=user-mode-linux-$version
+ fi
+ 
+-debarch=
+-set_debarch
+-
+ email=${DEBEMAIL-$EMAIL}
+ 
+ # use email string directly if it contains <email>
+@@ -174,16 +176,28 @@ Source: $sourcename
+ Section: kernel
+ Priority: optional
+ Maintainer: $maintainer
+-Rules-Requires-Root: no
+ Build-Depends: bc, rsync, kmod, cpio, bison, flex | flex:native $extra_build_depends
+ Homepage: https://www.kernel.org/
+ 
+-Package: $packagename-$version
++Package: $packagename
+ Architecture: $debarch
+ Description: Linux kernel, version $version
   This package contains the Linux kernel, modules and corresponding other
   files, version: $version.
  
@@ -254,9 +308,56 @@ index 6df3c9f..d33e1f3 100755
 +Description: Linux DTB, version $version
 + This package contains device blobs from the Linux kernel, version $version
 +
- Package: $kernel_headers_packagename
- Architecture: $debarch
++Package: $kernel_headers_packagename
++Architecture: $debarch
 +Depends: make, gcc, libc6-dev, bison, flex, libssl-dev
- Description: Linux kernel headers for $version on $debarch
-  This package provides kernel header files for $version on $debarch
-  .
++Description: Linux kernel headers for $version on $debarch
++ This package provides kernel header files for $version on $debarch
++ .
++ This is useful for people who need to build external modules
++
+ Package: linux-libc-dev
+ Section: devel
+ Provides: linux-kernel-headers
+@@ -194,22 +208,10 @@ Description: Linux support headers for userspace development
+ Multi-Arch: same
+ EOF
+ 
+-if is_enabled CONFIG_MODULES; then
+-cat <<EOF >> debian/control
+-
+-Package: linux-headers-$version
+-Architecture: $debarch
+-Description: Linux kernel headers for $version on $debarch
+- This package provides kernel header files for $version on $debarch
+- .
+- This is useful for people who need to build external modules
+-EOF
+-fi
+-
+ if is_enabled CONFIG_DEBUG_INFO; then
+ cat <<EOF >> debian/control
+ 
+-Package: linux-image-$version-dbg
++Package: $dbg_packagename
+ Section: debug
+ Architecture: $debarch
+ Description: Linux kernel debugging symbols for $version
+@@ -223,15 +225,11 @@ cat <<EOF > debian/rules
+ 
+ srctree ?= .
+ 
+-build-indep:
+-build-arch:
++build:
+ 	\$(MAKE) KERNELRELEASE=${version} ARCH=${ARCH} \
+ 	KBUILD_BUILD_VERSION=${revision} -f \$(srctree)/Makefile
+ 
+-build: build-arch
+-
+-binary-indep:
+-binary-arch: build-arch
++binary-arch:
+ 	\$(MAKE) KERNELRELEASE=${version} ARCH=${ARCH} \
+ 	KBUILD_BUILD_VERSION=${revision} -f \$(srctree)/Makefile intdeb-pkg
+ 

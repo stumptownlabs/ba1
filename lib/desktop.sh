@@ -19,7 +19,7 @@ create_desktop_package ()
 	PACKAGE_LIST_PREDEPENDS=${PACKAGE_LIST_PREDEPENDS// /,};
 	PACKAGE_LIST_PREDEPENDS=${PACKAGE_LIST_PREDEPENDS//[[:space:]]/}
 
-	local destination=${SRC}/.tmp/${RELEASE}/${BOARD}/${CHOSEN_DESKTOP}_${REVISION}_all
+	local destination=$(mktemp -d)${RELEASE}/${BOARD}/${CHOSEN_DESKTOP}_${REVISION}_all
 	rm -rf "${destination}"
 	mkdir -p "${destination}"/DEBIAN
 
@@ -95,7 +95,7 @@ create_desktop_package ()
 
 
 	# using different icon pack. Workaround due to this bug https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=867779
-	if [[ ${RELEASE} == bionic || ${RELEASE} == stretch || ${RELEASE} == buster || ${RELEASE} == bullseye || ${RELEASE} == focal || ${RELEASE} == eoan ]]; then
+	if [[ ${RELEASE} == bionic || ${RELEASE} == stretch || ${RELEASE} == buster || ${RELEASE} == bullseye || ${RELEASE} == focal || ${RELEASE} == groovy ]]; then
 	sed -i 's/<property name="IconThemeName" type="string" value=".*$/<property name="IconThemeName" type="string" value="Humanity-Dark"\/>/g' \
 	"${destination}"/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
 	fi
@@ -114,9 +114,10 @@ create_desktop_package ()
 
 	# create board DEB file
 	display_alert "Building desktop package" "${CHOSEN_DESKTOP}_${REVISION}_all" "info"
-	fakeroot dpkg-deb -b "${destination}" "${destination}.deb" >/dev/null
+
 	mkdir -p "${DEB_STORAGE}/${RELEASE}"
-	mv "${destination}.deb" "${DEB_STORAGE}/${RELEASE}"
+	cd "${destination}"; cd ..
+	fakeroot dpkg-deb -b "${destination}" "${DEB_STORAGE}/${RELEASE}/${CHOSEN_DESKTOP}_${REVISION}_all.deb"  >/dev/null
 	# cleanup
 	rm -rf "${destination}"
 }

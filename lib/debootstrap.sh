@@ -108,7 +108,9 @@ create_rootfs_cache()
 	for ((n=0;n<${cycles};n++)); do
 
 		local packages_hash=$(get_package_list_hash "$(($ROOTFSCACHE_VERSION - $n))")
-		local cache_type=$(if [[ ${BUILD_DESKTOP} == yes  ]]; then echo "desktop"; elif [[ ${BUILD_MINIMAL} == yes  ]]; then echo "minimal"; else echo "cli";fi)
+		[[ -z ${FORCED_MONTH_OFFSET} ]] && FORCED_MONTH_OFFSET=${n}
+		local packages_hash=$(get_package_list_hash "$(date -d "$D +${FORCED_MONTH_OFFSET} month" +"%Y-%m-module$ROOTFSCACHE_VERSION" | sed 's/^0*//')")
+		local cache_type=$(if [[ ${BUILD_DESKTOP} == yes  ]]; then echo "xfce-desktop"; elif [[ ${BUILD_MINIMAL} == yes  ]]; then echo "minimal"; else echo "cli";fi)
 		local cache_name=${RELEASE}-${cache_type}-${ARCH}.$packages_hash.tar.lz4
 		local cache_fname=${SRC}/cache/rootfs/${cache_name}
 		local display_name=${RELEASE}-${cache_type}-${ARCH}.${packages_hash:0:3}...${packages_hash:29}.tar.lz4
@@ -313,10 +315,11 @@ prepare_partitions()
 	parttype[fat]=fat16
 	parttype[f2fs]=ext4 # not a copy-paste error
 	parttype[btrfs]=btrfs
+	parttype[xfs]=xfs
 	# parttype[nfs] is empty
 
 	# metadata_csum and 64bit may need to be disabled explicitly when migrating to newer supported host OS releases
-	if [[ $(lsb_release -sc) =~ bionic|buster|bullseye|cosmic|eoan|focal ]]; then
+	if [[ $(lsb_release -sc) =~ bionic|buster|bullseye|cosmic|groovy|focal ]]; then
 		mkopts[ext4]='-q -m 2 -O ^64bit,^metadata_csum'
 	elif [[ $(lsb_release -sc) == xenial ]]; then
 		mkopts[ext4]='-q -m 2'
@@ -325,6 +328,7 @@ prepare_partitions()
 	mkopts[ext2]='-q'
 	# mkopts[f2fs] is empty
 	mkopts[btrfs]='-m dup'
+	# mkopts[xfs] is empty
 	# mkopts[nfs] is empty
 
 	mkfs[ext4]=ext4
@@ -332,6 +336,7 @@ prepare_partitions()
 	mkfs[fat]=vfat
 	mkfs[f2fs]=f2fs
 	mkfs[btrfs]=btrfs
+	mkfs[xfs]=xfs
 	# mkfs[nfs] is empty
 
 	mountopts[ext4]=',commit=600,errors=remount-ro'
@@ -339,6 +344,7 @@ prepare_partitions()
 	# mountopts[fat] is empty
 	# mountopts[f2fs] is empty
 	mountopts[btrfs]=',commit=600'
+	# mountopts[xfs] is empty
 	# mountopts[nfs] is empty
 
 	# default BOOTSIZE to use if not specified
@@ -522,7 +528,9 @@ prepare_partitions()
 		else
 			sed -i 's/^setenv rootdev .*/setenv rootdev "'$rootfs'"/' $SDCARD/boot/boot.ini
 		fi
-		[[ -f $SDCARD/boot/armbianEnv.txt ]] && rm $SDCARD/boot/armbianEnv.txt
+		if [[  $LINUXFAMILY != meson64 ]]; then
+			[[ -f $SDCARD/boot/armbianEnv.txt ]] && rm $SDCARD/boot/armbianEnv.txt
+		fi
 	fi
 
 	# if we have a headless device, set console to DEFAULT_CONSOLE
@@ -564,6 +572,9 @@ update_initramfs()
 
 	chroot $chroot_target /bin/bash -c "$update_initramfs_cmd" >> $DEST/debug/install.log 2>&1
 	display_alert "Updated initramfs." "for details see: $DEST/debug/install.log" "ext"
+
+	display_alert "Re-enabling" "initramfs-tools hook for kernel"
+	chroot "${SDCARD}" /bin/bash -c "chmod +x /etc/kernel/postinst.d/initramfs-tools" >> "${DEST}"/debug/install.log 2>&1
 
 	umount_chroot "$chroot_target/"
 	rm $chroot_target/usr/bin/$QEMU_BINARY
