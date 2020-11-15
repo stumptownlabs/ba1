@@ -8,6 +8,15 @@ git submodule update
 ./compile.sh EXTRAWIFI="no"
 ```
 
+to grab the latest from other repo, start with a clean pull
+
+```
+git clone git@gitlab.com:nova/ba1.git
+cd ba1/
+git remote add public git@github.com:ericmigi/ba1.git
+git pull public master # Creates a merge commit
+git push origin master
+```
 
 
 <h3 align=center><a href="#armbian-build-tools"><img src=".github/armbian-logo.png" alt="Armbian logo" width="144"></a><br>
