@@ -4,7 +4,7 @@ How to compile Armbian for novachat
 git clone git@gitlab.com:nova/ba1.git
 cd ba1
 git submodule init
-git submodule update
+git submodule update --remote
 ./compile.sh EXTRAWIFI="no"
 ```
 
